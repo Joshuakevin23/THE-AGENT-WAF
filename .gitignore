@@ -1,0 +1,30 @@
+# Virtual Environment
+venv/
+.venv/
+env/
+ENV/
+
+# Python Cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Databases
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Secrets & Environment variables
+.env
+.env.local
+.env.*
+
+# Generated WAF Reports
+reports/
+
+# OS specific files
+.DS_Store
+Thumbs.db
