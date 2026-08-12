@@ -62,10 +62,10 @@ def calculate_risk_score(ctx: CallContext, session: SessionState, tool_rules: Li
     if has_adjacent:
         risk_score += 2
 
-    # 4. Timing speed check (+3 risk if sequence check passes but tools called < 500ms apart)
+    # 4. Timing speed check (+1 risk if sequence check passes but tools called < 500ms apart)
     if session.last_allowed_call_time is not None:
         elapsed = ctx.timestamp - session.last_allowed_call_time
         if elapsed < 0.5:  # Less than 500ms
-            risk_score += 3
+            risk_score += 1
 
     return risk_score
