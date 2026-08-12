@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent WAF — Real-Time Policy Dashboard</title>
+  <!-- Modern Google Font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg-dark: #090d16;
+      --panel-bg: rgba(17, 24, 39, 0.7);
+      --border-color: rgba(255, 255, 255, 0.08);
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --primary: #6366f1;
+      --primary-glow: rgba(99, 102, 241, 0.15);
+      --accent-allow: #10b981;
+      --accent-allow-glow: rgba(16, 185, 129, 0.1);
+      --accent-block: #ef4444;
+      --accent-block-glow: rgba(239, 68, 68, 0.15);
+      --accent-shadow: #f59e0b;
+      --accent-shadow-glow: rgba(245, 158, 11, 0.15);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      background-color: var(--bg-dark);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.1) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.05) 0px, transparent 50%);
+      background-attachment: fixed;
+      color: var(--text-main);
+      min-height: 100vh;
+      overflow-x: hidden;
+      padding: 24px;
+    }
+
+    /* Container */
+    .dashboard-container {
+      max-width: 1600px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--panel-bg);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 20px 32px;
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    }
+
+    .brand-title {
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      background: linear-gradient(135deg, #a5b4fc 0%, #6366f1 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-muted);
+      background: rgba(255, 255, 255, 0.03);
+      padding: 6px 16px;
+      border-radius: 100px;
+      border: 1px solid var(--border-color);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: var(--accent-block);
+      box-shadow: 0 0 10px var(--accent-block);
+      transition: all 0.3s ease;
+    }
+
+    .status-dot.connected {
+      background-color: var(--accent-allow);
+      box-shadow: 0 0 12px var(--accent-allow);
+    }
+
+    /* Metrics Grid */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+    }
+
+    .metric-card {
+      background: var(--panel-bg);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 4px 20px 0 rgba(0, 0, 0, 0.2);
+      transition: transform 0.2s, box-shadow 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .metric-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 30px 0 rgba(99, 102, 241, 0.1);
+      border-color: rgba(99, 102, 241, 0.3);
+    }
+
+    .metric-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 12px;
+    }
+
+    .metric-value {
+      font-size: 36px;
+      font-weight: 800;
+      letter-spacing: -1px;
+      line-height: 1;
+    }
+
+    .metric-spark {
+      position: absolute;
+      bottom: 0;
+      right: 0;
+      width: 80px;
+      height: 80px;
+      opacity: 0.05;
+      background: linear-gradient(135deg, transparent 40%, var(--primary) 100%);
+      pointer-events: none;
+    }
+
+    /* Columns Layout */
+    .dashboard-body {
+      display: grid;
+      grid-template-columns: 3fr 2fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 1100px) {
+      .dashboard-body {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Panel Base */
+    .panel {
+      background: var(--panel-bg);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 24px;
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.25);
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 16px;
+    }
+
+    .panel-title {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.2px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Log Panel */
+    .log-container {
+      overflow-x: auto;
+      max-height: 600px;
+      min-height: 400px;
+      border-radius: 8px;
+    }
+
+    .log-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 14px;
+    }
+
+    .log-table th {
+      background: rgba(255, 255, 255, 0.02);
+      padding: 14px 16px;
+      font-weight: 600;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border-color);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      backdrop-filter: blur(8px);
+    }
+
+    .log-table td {
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+      vertical-align: middle;
+    }
+
+    .log-table tr {
+      transition: background-color 0.15s ease;
+    }
+
+    .log-table tr:hover {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    /* Badges & Tags */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.2px;
+      text-transform: uppercase;
+    }
+
+    .badge-allowed {
+      background-color: var(--accent-allow-glow);
+      color: var(--accent-allow);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+    }
+
+    .badge-blocked {
+      background-color: var(--accent-block-glow);
+      color: var(--accent-block);
+      border: 1px solid rgba(239, 68, 68, 0.25);
+    }
+
+    .badge-shadow {
+      background-color: var(--accent-shadow-glow);
+      color: var(--accent-shadow);
+      border: 1px solid rgba(245, 158, 11, 0.25);
+    }
+
+    .code-text {
+      font-family: 'JetBrains Mono', monospace;
+      background: rgba(255, 255, 255, 0.04);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 13px;
+      color: #cbd5e1;
+      max-width: 320px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: inline-block;
+    }
+
+    .risk-badge {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    .risk-low { color: var(--accent-allow); background: rgba(16, 185, 129, 0.08); }
+    .risk-med { color: var(--accent-shadow); background: rgba(245, 158, 11, 0.08); }
+    .risk-high { color: var(--accent-block); background: rgba(239, 68, 68, 0.08); }
+
+    /* Chart Layout */
+    .charts-column {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .chart-container {
+      position: relative;
+      height: 230px;
+      width: 100%;
+    }
+
+    /* Log Empty State */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 300px;
+      color: var(--text-muted);
+      gap: 12px;
+    }
+
+    .empty-state svg {
+      width: 48px;
+      height: 48px;
+      opacity: 0.3;
+    }
+
+    /* Slide animation for new rows */
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(-8px);
+        background: rgba(99, 102, 241, 0.08);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .new-row {
+      animation: slideIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+  </style>
+</head>
+<body>
+  <div class="dashboard-container">
+    <!-- Header -->
+    <header>
+      <div>
+        <h1 class="brand-title">🛡️ Agent WAF</h1>
+        <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">Real-Time Agent Security & Policy Interceptor</p>
+      </div>
+      <div style="display: flex; gap: 16px; align-items: center;">
+        <a href="chat.html" style="font-family: 'Outfit', sans-serif; text-decoration: none; font-size: 14px; font-weight: 600; color: #a5b4fc; background: rgba(99, 102, 241, 0.1); padding: 8px 16px; border-radius: 8px; border: 1px solid rgba(99, 102, 241, 0.2); transition: all 0.2s ease;">💬 Launch Chatbot</a>
+        <div class="status-badge">
+          <span class="status-dot" id="ws-status-dot"></span>
+          <span id="ws-status-text">Disconnected</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Metrics Summary -->
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <p class="metric-title">Total Intercepts</p>
+        <p class="metric-value" id="metric-total">0</p>
+        <div class="metric-spark"></div>
+      </div>
+      <div class="metric-card">
+        <p class="metric-title">Blocked Requests</p>
+        <p class="metric-value" id="metric-blocked" style="color: var(--accent-block);">0</p>
+        <div class="metric-spark" style="background: linear-gradient(135deg, transparent, var(--accent-block));"></div>
+      </div>
+      <div class="metric-card">
+        <p class="metric-title">Shadow Blocks</p>
+        <p class="metric-value" id="metric-shadow" style="color: var(--accent-shadow);">0</p>
+        <div class="metric-spark" style="background: linear-gradient(135deg, transparent, var(--accent-shadow));"></div>
+      </div>
+      <div class="metric-card">
+        <p class="metric-title">Block Rate %</p>
+        <p class="metric-value" id="metric-rate">0.0%</p>
+        <div class="metric-spark"></div>
+      </div>
+    </div>
+
+    <!-- Layout Grid -->
+    <div class="dashboard-body">
+      <!-- Logs List (Left) -->
+      <section class="panel">
+        <div class="panel-header">
+          <h2 class="panel-title">📡 Real-Time Interception Feed</h2>
+          <span style="font-size: 12px; color: var(--text-muted);" id="session-count">0 Sessions Active</span>
+        </div>
+        <div class="log-container">
+          <table class="log-table" id="log-table">
+            <thead>
+              <tr>
+                <th style="width: 12%;">Time</th>
+                <th style="width: 15%;">Session ID</th>
+                <th style="width: 15%;">Tool</th>
+                <th style="width: 25%;">Parameters</th>
+                <th style="width: 8%;">Risk</th>
+                <th style="width: 12%;">Status</th>
+                <th style="width: 13%;">Reason</th>
+              </tr>
+            </thead>
+            <tbody id="log-body">
+              <!-- Dynamically populated rows -->
+            </tbody>
+          </table>
+          <div class="empty-state" id="log-empty-state">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+            </svg>
+            <p>Awaiting incoming tool calls from agent...</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Charts (Right) -->
+      <div class="charts-column">
+        <!-- Lines Chart -->
+        <section class="panel">
+          <div class="panel-header">
+            <h3 class="panel-title">📈 System Load (Calls/Min)</h3>
+          </div>
+          <div class="chart-container">
+            <canvas id="chart-load"></canvas>
+          </div>
+        </section>
+
+        <!-- Bar Chart -->
+        <section class="panel">
+          <div class="panel-header">
+            <h3 class="panel-title">📊 Violations by Rule Type</h3>
+          </div>
+          <div class="chart-container">
+            <canvas id="chart-violations"></canvas>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main app script -->
+  <script src="app.js"></script>
+</body>
+</html>

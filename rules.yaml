@@ -1,0 +1,24 @@
+enforce: true   # global default; can be overridden per-rule
+
+tools:
+  execute_sql:
+    - type: rate_limit
+      max_calls: 5
+      window_seconds: 60
+    - type: sequence
+      requires: [get_schema, validate_sql]   # both must have occurred earlier this session
+    - type: data_scope
+      param: sql
+      allowed_table_prefix: "project_x_"      # reject queries referencing tables outside this prefix
+
+  validate_sql:
+    - type: param_blocklist
+      param: sql
+      patterns: ["ignore.*instruction", "ignore.*prompt", "system.*prompt", "sensitive.*data", "DROP TABLE", "--", ";--", "<script", "delete from", "truncate table", "insert into", "update ", "delete ", "alter table", "create table", "create database", "drop database"]
+      max_length: 4000
+
+  get_schema:
+    - type: rate_limit
+      max_calls: 10
+      window_seconds: 60
+      enforce: false   # shadow mode for this specific rule — logs shadow_block, still allows the call
