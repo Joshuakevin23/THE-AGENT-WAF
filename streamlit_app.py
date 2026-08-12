@@ -395,7 +395,7 @@ elif page.startswith("📊 Admin Dashboard"):
                 # Parse timestamp and group into time series
                 df["datetime"] = pd.to_datetime(df["ts"])
                 # Group by 10 seconds intervals
-                df_grouped = df.resample("10S", on="datetime").size().reset_index(name="Calls")
+                df_grouped = df.resample("10s", on="datetime").size().reset_index(name="Calls")
                 df_grouped = df_grouped.tail(15) # Show last 15 periods
                 st.line_chart(df_grouped.set_index("datetime")["Calls"])
             else:
