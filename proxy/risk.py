@@ -42,6 +42,13 @@ def calculate_risk_score(ctx: CallContext, session: SessionState, tool_rules: Li
     if matched_fuzzy:
         risk_score += 2
 
+    # Check for destructive commands specifically
+    destructive_keywords = ["drop ", "truncate ", "delete ", "update ", "alter "]
+    for d_word in destructive_keywords:
+        if d_word in sql_val.lower():
+            risk_score += 3
+            break
+
     # 3. Data scope adjacency (+2 risk)
     # If the SQL contains references to adjacent tenants (e.g., "project_y" or "other_tenant" or base tables
     # inside comments/strings, but did not trigger data_scope because it wasn't extracted as a raw table name)
