@@ -474,33 +474,50 @@ elif page == "🧪 Demo Scenarios":
 
     # Scenario Definitions
     scenarios = {
-        "1. Happy Path (Allowed)": [
-            {"tool": "get_schema", "params": {}},
-            {"tool": "validate_sql", "params": {"sql": "SELECT * FROM project_x_customers;"}},
-            {"tool": "execute_sql", "params": {"sql": "SELECT * FROM project_x_customers;"}}
-        ],
-        "2. Data Scope Block (Blocked)": [
-            {"tool": "get_schema", "params": {}},
-            {"tool": "validate_sql", "params": {"sql": "SELECT * FROM other_tenant_orders;"}},
-        ],
-        "3. Shadow Mode (Shadowed)": [
-            {"tool": "get_schema", "params": {}},
-            {"tool": "validate_sql", "params": {"sql": "SELECT * FROM project_x_orders;"}},
-            {"tool": "execute_sql", "params": {"sql": "SELECT * FROM project_x_orders;"}}
-        ],
-        "4. High Risk (HITL)": [
-            {"tool": "get_schema", "params": {}},
-            {"tool": "validate_sql", "params": {"sql": "DROP TABLE project_x_customers;"}},
-            {"tool": "execute_sql", "params": {"sql": "DROP TABLE project_x_customers;"}}
-        ]
+        "1. Happy Path (Allowed)": {
+            "desc": "Simulates a standard allowed query where the agent checks the schema and queries a permitted table.",
+            "steps": [
+                {"tool": "get_schema", "params": {}},
+                {"tool": "validate_sql", "params": {"sql": "SELECT * FROM project_x_customers;"}},
+                {"tool": "execute_sql", "params": {"sql": "SELECT * FROM project_x_customers;"}}
+            ]
+        },
+        "2. Data Scope Block (Blocked)": {
+            "desc": "Simulates the agent attempting to access another tenant's table (other_tenant_orders), which is immediately blocked.",
+            "steps": [
+                {"tool": "get_schema", "params": {}},
+                {"tool": "validate_sql", "params": {"sql": "SELECT * FROM other_tenant_orders;"}},
+            ]
+        },
+        "3. Shadow Mode (Shadowed)": {
+            "desc": "Simulates the agent querying project_x_orders. The policy is in shadow mode, so it blocks the real query but returns fake/empty data to the agent so it doesn't crash.",
+            "steps": [
+                {"tool": "get_schema", "params": {}},
+                {"tool": "validate_sql", "params": {"sql": "SELECT * FROM project_x_orders;"}},
+                {"tool": "execute_sql", "params": {"sql": "SELECT * FROM project_x_orders;"}}
+            ]
+        },
+        "4. High Risk (HITL)": {
+            "desc": "Simulates the agent attempting a destructive action (DROP TABLE). This is flagged as High Risk and sent for administrator approval.",
+            "steps": [
+                {"tool": "get_schema", "params": {}},
+                {"tool": "validate_sql", "params": {"sql": "DROP TABLE project_x_customers;"}},
+                {"tool": "execute_sql", "params": {"sql": "DROP TABLE project_x_customers;"}}
+            ]
+        }
     }
 
     # Scenario Buttons
     col1, col2 = st.columns(2)
-    for idx, (s_name, s_steps) in enumerate(scenarios.items()):
+    for idx, (s_name, s_data) in enumerate(scenarios.items()):
         target_col = col1 if idx % 2 == 0 else col2
-        if target_col.button(f"▶️ Run {s_name}", use_container_width=True):
-            run_scenario(s_name, s_steps)
+        with target_col:
+            st.markdown(f"**{s_name}**")
+            st.caption(s_data["desc"])
+            if st.button(f"▶️ Run", key=s_name, use_container_width=True):
+                run_scenario(s_name, s_data["steps"])
+        if idx % 2 == 1:
+            st.write("") # spacing
 
     st.divider()
 
@@ -515,14 +532,18 @@ elif page == "🧪 Demo Scenarios":
             disposition = data.get("disposition", "unknown")
             if disposition == "blocked":
                 disp_html = "<span class='status-blocked'>Blocked</span>"
+                status_emoji = "🛑"
             elif disposition == "shadow_block":
                 disp_html = "<span class='status-shadow'>Shadow Blocked</span>"
+                status_emoji = "👻"
             elif disposition == "pending_hitl":
                 disp_html = "<span style='color: orange; font-weight: bold;'>Pending HITL</span>"
+                status_emoji = "⏳"
             else:
                 disp_html = "<span class='status-allowed'>Allowed</span>"
+                status_emoji = "✅"
             
-            st.markdown(f"### Step {step}: `{tool}`")
+            st.markdown(f"### {status_emoji} Step {step}: `{tool}`")
             st.markdown(disp_html, unsafe_allow_html=True)
             
             c1, c2 = st.columns(2)
@@ -541,8 +562,25 @@ elif page == "🧪 Demo Scenarios":
                     st.info("No explicit reason provided.")
             with c2:
                 st.markdown(f"**Risk Band:** {data.get('risk_band')} (Score: {data.get('risk_score')})")
-                st.markdown("**Raw Output:**")
-                st.json(data.get("result", {}))
+                st.markdown("**Execution Summary:**")
+                
+                # Format output as summary instead of raw JSON
+                result_data = data.get("result", {})
+                if disposition == "blocked":
+                    st.markdown("*Execution was blocked. No data returned from database.*")
+                elif disposition == "shadow_block":
+                    st.markdown("*Execution was simulated (shadowed). Returned safe mock data to the agent.*")
+                elif disposition == "pending_hitl":
+                    st.markdown("*Execution is suspended awaiting Administrator Approval.*")
+                elif tool == "get_schema":
+                    tables = result_data.get("schema", {}).keys()
+                    st.markdown(f"*Successfully retrieved schema for {len(tables)} tables.*")
+                elif tool == "execute_sql":
+                    rows = result_data.get("rows", [])
+                    st.markdown(f"*Successfully executed query. Returned {len(rows)} rows.*")
+                else:
+                    st.markdown(f"*Action '{tool}' completed successfully.*")
+                    
             st.divider()
             
         if st.button("Clear Results"):
