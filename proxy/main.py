@@ -337,6 +337,9 @@ async def invoke_tool(request: InvokeRequest, background_tasks: BackgroundTasks)
     tool_rules = config.get_tool_rules(request.tool)
     
     # Check if this exact tool call was recently approved by HITL
+    # Both execute_sql and validate_sql can receive HITL approvals for their own reviews.
+    # The DB lookup matches on (session_id + tool + params) so a validate_sql approval
+    # cannot accidentally be consumed by execute_sql and vice versa.
     already_approved = False
     if request.tool in ["execute_sql", "validate_sql"]:
         already_approved = check_recent_approval(request.session_id, request.tool, request.params)
