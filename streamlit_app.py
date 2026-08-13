@@ -98,6 +98,27 @@ if "session_id" not in st.session_state:
 
 st.sidebar.text_input("Active Session ID", value=st.session_state.session_id, disabled=True)
 
+st.sidebar.divider()
+if st.sidebar.button("🚀 Run Automated Demo Agent", use_container_width=True, help="Simulate a scripted agent to generate test traffic logs"):
+    agent_id = "agent-scripted"
+    demo_session_id = f"demo-{int(time.time())}"
+    with st.sidebar.status("Running Demo Agent...", expanded=True) as status:
+        st.write("1️⃣ Calling `get_schema`...")
+        requests.post(f"{BACKEND_URL}/invoke", json={"agent_id": agent_id, "session_id": demo_session_id, "tool": "get_schema", "params": {}}, timeout=5)
+        time.sleep(0.5)
+        st.write("2️⃣ Calling `validate_sql`...")
+        sql = "SELECT * FROM project_x_customers;"
+        requests.post(f"{BACKEND_URL}/invoke", json={"agent_id": agent_id, "session_id": demo_session_id, "tool": "validate_sql", "params": {"sql": sql}}, timeout=5)
+        time.sleep(0.5)
+        st.write("3️⃣ Calling `execute_sql`...")
+        requests.post(f"{BACKEND_URL}/invoke", json={"agent_id": agent_id, "session_id": demo_session_id, "tool": "execute_sql", "params": {"sql": sql}}, timeout=5)
+        time.sleep(0.5)
+        status.update(label="Demo Complete! Check Admin Dashboard.", state="complete", expanded=False)
+    st.sidebar.success("Test traffic injected!")
+    time.sleep(1)
+    st.rerun()
+st.sidebar.divider()
+
 # Display DB Info in Sidebar
 st.sidebar.info("""
 ### 📋 Seeded DB Info
