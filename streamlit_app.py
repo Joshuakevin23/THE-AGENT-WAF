@@ -102,21 +102,27 @@ st.sidebar.divider()
 if st.sidebar.button("🚀 Run Automated Demo Agent", use_container_width=True, help="Simulate a scripted agent to generate test traffic logs"):
     agent_id = "agent-scripted"
     demo_session_id = f"demo-{int(time.time())}"
+    results = []
     with st.sidebar.status("Running Demo Agent...", expanded=True) as status:
         st.write("1️⃣ Calling `get_schema`...")
-        requests.post(f"{BACKEND_URL}/invoke", json={"agent_id": agent_id, "session_id": demo_session_id, "tool": "get_schema", "params": {}}, timeout=5)
+        r1 = requests.post(f"{BACKEND_URL}/invoke", json={"agent_id": agent_id, "session_id": demo_session_id, "tool": "get_schema", "params": {}}, timeout=5).json()
+        results.append({"step": 1, "tool": "get_schema", "response": r1})
         time.sleep(0.5)
+        
         st.write("2️⃣ Calling `validate_sql`...")
         sql = "SELECT * FROM project_x_customers;"
-        requests.post(f"{BACKEND_URL}/invoke", json={"agent_id": agent_id, "session_id": demo_session_id, "tool": "validate_sql", "params": {"sql": sql}}, timeout=5)
+        r2 = requests.post(f"{BACKEND_URL}/invoke", json={"agent_id": agent_id, "session_id": demo_session_id, "tool": "validate_sql", "params": {"sql": sql}}, timeout=5).json()
+        results.append({"step": 2, "tool": "validate_sql", "response": r2})
         time.sleep(0.5)
+        
         st.write("3️⃣ Calling `execute_sql`...")
-        requests.post(f"{BACKEND_URL}/invoke", json={"agent_id": agent_id, "session_id": demo_session_id, "tool": "execute_sql", "params": {"sql": sql}}, timeout=5)
+        r3 = requests.post(f"{BACKEND_URL}/invoke", json={"agent_id": agent_id, "session_id": demo_session_id, "tool": "execute_sql", "params": {"sql": sql}}, timeout=5).json()
+        results.append({"step": 3, "tool": "execute_sql", "response": r3})
         time.sleep(0.5)
-        status.update(label="Demo Complete! Check Admin Dashboard.", state="complete", expanded=False)
-    st.sidebar.success("Test traffic injected!")
-    time.sleep(1)
-    st.rerun()
+        
+        status.update(label="Demo Complete! View Results in Main Panel.", state="complete", expanded=False)
+    
+    st.session_state.demo_results = results
 st.sidebar.divider()
 
 # Display DB Info in Sidebar
@@ -244,6 +250,53 @@ def render_traces(steps):
 if page == "🤖 Chat Agent Console":
     st.title("🤖 Agent WAF Chat Console")
     st.caption("Interact with the tenant database. Your queries and intermediate tool actions are processed via WAF.")
+
+    # Render Automated Demo Results if triggered
+    if "demo_results" in st.session_state and st.session_state.demo_results:
+        st.info("ℹ️ **Automated Demo Agent Results**")
+        with st.expander("🚀 View Detailed Pipeline Execution for Demo Agent", expanded=True):
+            for res in st.session_state.demo_results:
+                step = res["step"]
+                tool = res["tool"]
+                data = res["response"]
+                
+                disposition = data.get("disposition", "unknown")
+                if disposition == "blocked":
+                    disp_html = "<span class='status-blocked'>Blocked</span>"
+                elif disposition == "shadow_block":
+                    disp_html = "<span class='status-shadow'>Shadow Blocked</span>"
+                elif disposition == "pending_hitl":
+                    disp_html = "<span style='color: orange; font-weight: bold;'>Pending HITL</span>"
+                else:
+                    disp_html = "<span class='status-allowed'>Allowed</span>"
+                
+                st.markdown(f"### Step {step}: `{tool}`")
+                st.markdown(disp_html, unsafe_allow_html=True)
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.markdown("**Action Reason / Justification:**")
+                    if data.get("reason"):
+                        if disposition == "blocked":
+                            st.error(data.get("reason"))
+                        elif disposition == "shadow_block":
+                            st.warning(data.get("reason"))
+                        elif disposition == "pending_hitl":
+                            st.warning(data.get("reason"))
+                        else:
+                            st.success(data.get("reason"))
+                    else:
+                        st.info("No explicit reason provided.")
+                with col2:
+                    st.markdown(f"**Risk Band:** {data.get('risk_band')} (Score: {data.get('risk_score')})")
+                    st.markdown("**Raw Output / Response:**")
+                    st.json(data.get("result", {}))
+                
+                st.divider()
+        
+        if st.button("Clear Demo Results"):
+            st.session_state.demo_results = None
+            st.rerun()
 
     # Check if there is a pending review that needs approval checking
     if "pending_review" in st.session_state and st.session_state.pending_review:
