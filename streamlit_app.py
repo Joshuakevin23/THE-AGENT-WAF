@@ -483,26 +483,35 @@ elif page == "🧪 Demo Scenarios":
             ]
         },
         "2. Data Scope Block (Blocked)": {
-            "desc": "Simulates the agent attempting to access another tenant's table (other_tenant_orders), which is immediately blocked.",
+            "desc": "Simulates the agent attempting to access another tenant's table (other_tenant_orders), which is immediately blocked upon execution.",
             "steps": [
                 {"tool": "get_schema", "params": {}},
                 {"tool": "validate_sql", "params": {"sql": "SELECT * FROM other_tenant_orders;"}},
+                {"tool": "execute_sql", "params": {"sql": "SELECT * FROM other_tenant_orders;"}}
             ]
         },
         "3. Shadow Mode (Shadowed)": {
-            "desc": "Simulates the agent querying project_x_orders. The policy is in shadow mode, so it blocks the real query but returns fake/empty data to the agent so it doesn't crash.",
+            "desc": "Simulates the agent querying the schema multiple times in a row, which triggers the rate-limit rule but it is in 'shadow mode' (so it shadows instead of blocking).",
             "steps": [
                 {"tool": "get_schema", "params": {}},
-                {"tool": "validate_sql", "params": {"sql": "SELECT * FROM project_x_orders;"}},
-                {"tool": "execute_sql", "params": {"sql": "SELECT * FROM project_x_orders;"}}
+                {"tool": "get_schema", "params": {}},
+                {"tool": "get_schema", "params": {}},
+                {"tool": "get_schema", "params": {}},
+                {"tool": "get_schema", "params": {}},
+                {"tool": "get_schema", "params": {}},
+                {"tool": "get_schema", "params": {}},
+                {"tool": "get_schema", "params": {}},
+                {"tool": "get_schema", "params": {}},
+                {"tool": "get_schema", "params": {}},
+                {"tool": "get_schema", "params": {}}
             ]
         },
         "4. High Risk (HITL)": {
-            "desc": "Simulates the agent attempting a destructive action (DROP TABLE). This is flagged as High Risk and sent for administrator approval.",
+            "desc": "Simulates the agent attempting a destructive action (TRUNCATE). This passes the initial validator but is flagged as High Risk (Score 3) and sent for administrator approval.",
             "steps": [
                 {"tool": "get_schema", "params": {}},
-                {"tool": "validate_sql", "params": {"sql": "DROP TABLE project_x_customers;"}},
-                {"tool": "execute_sql", "params": {"sql": "DROP TABLE project_x_customers;"}}
+                {"tool": "validate_sql", "params": {"sql": "TRUNCATE project_x_customers;"}},
+                {"tool": "execute_sql", "params": {"sql": "TRUNCATE project_x_customers;"}}
             ]
         }
     }
