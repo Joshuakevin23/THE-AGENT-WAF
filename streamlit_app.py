@@ -456,22 +456,72 @@ elif page == "🧪 Demo Scenarios":
     st.caption("Click a scenario below to run a scripted sequence of WAF tool calls and see how the proxy responds.")
     
     # Helper to run a sequence
-    def run_scenario(name, steps):
-        agent_id = f"demo-{name.lower().replace(' ', '-')}"
-        session_id = f"{agent_id}-{int(time.time())}"
-        results = []
+    def run_scenario(name, steps, resume_data=None):
+        agent_id = resume_data["agent_id"] if resume_data else f"demo-{name.lower().replace(' ', '-')}"
+        session_id = resume_data["session_id"] if resume_data else f"{agent_id}-{int(time.time())}"
+        results = resume_data["results"] if resume_data else []
+        start_idx = resume_data["current_step_idx"] if resume_data else 1
+        
         with st.status(f"Running Scenario: {name}...", expanded=True) as status:
-            for step_idx, step in enumerate(steps, 1):
+            for i, step in enumerate(steps):
+                step_idx = start_idx + i
                 tool = step["tool"]
                 params = step["params"]
                 st.write(f"{step_idx}️⃣ Calling `{tool}`...")
                 res = requests.post(f"{BACKEND_URL}/invoke", json={"agent_id": agent_id, "session_id": session_id, "tool": tool, "params": params}, timeout=5).json()
+                
+                # If HITL triggered, halt the scenario
+                if res.get("disposition") == "pending_hitl":
+                    status.update(label="Scenario paused for Admin Approval.", state="error", expanded=False)
+                    st.session_state.demo_pending_review = {
+                        "review_id": res.get("review_id"),
+                        "name": name,
+                        "agent_id": agent_id,
+                        "session_id": session_id,
+                        "current_step_idx": step_idx,
+                        "remaining_steps": steps[i:], # Include the current step so it gets re-run when approved
+                        "results": results
+                    }
+                    st.rerun()
+                    return
+
                 results.append({"step": step_idx, "tool": tool, "response": res})
                 time.sleep(0.5)
             status.update(label=f"Scenario Complete!", state="complete", expanded=False)
         st.session_state.scenario_results = results
         st.rerun()
 
+    # Check for pending HITL demo review
+    if "demo_pending_review" in st.session_state and st.session_state.demo_pending_review:
+        review = st.session_state.demo_pending_review
+        review_id = review["review_id"]
+        
+        try:
+            status_res = requests.get(f"{BACKEND_URL}/admin/reviews/{review_id}", timeout=3)
+            if status_res.status_code == 200:
+                rev_data = status_res.json()
+                decision = rev_data.get("decision")
+                if decision == "approved":
+                    st.success("✅ Action approved by administrator! Resuming scenario...")
+                    st.session_state.demo_pending_review = None
+                    # Resume by re-running the remaining steps (which starts with the originally pending tool call)
+                    run_scenario(review["name"], review["remaining_steps"], resume_data=review)
+                elif decision == "denied":
+                    st.error("❌ Action denied by administrator. Scenario halted.")
+                    # Manually inject the blocked result for the pending step
+                    review["results"].append({
+                        "step": review["current_step_idx"],
+                        "tool": review["remaining_steps"][0]["tool"],
+                        "response": {"disposition": "blocked", "reason": "Action denied by administrator.", "risk_score": 3, "risk_band": "HIGH"}
+                    })
+                    st.session_state.scenario_results = review["results"]
+                    st.session_state.demo_pending_review = None
+                    st.rerun()
+                else:
+                    st.info(f"⏳ **Scenario paused.** Action pending administrator approval (Review ID: `{review_id}`).\n\nPlease switch to the **📊 Admin Dashboard** in the sidebar to review and approve it, then return here.")
+        except Exception as e:
+            st.error(f"Error checking review status: {e}")
+            
     # Scenario Definitions
     scenarios = {
         "1. Happy Path (Allowed)": {
