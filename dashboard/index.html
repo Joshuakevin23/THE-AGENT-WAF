@@ -1098,7 +1098,8 @@
 ════════════════════════════════════════════════════════════════ -->
 <script>
 // ── Constants ──────────────────────────────────────────────────────
-const API = 'http://127.0.0.1:8000';
+const isLocal = window.location.protocol === 'file:' || window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost';
+const API = isLocal ? 'http://127.0.0.1:8000' : '/api';
 let sessionId = 'sess-ui-' + Math.floor(Date.now() / 1000);
 let currentModel = 'openai/gpt-oss-120b';
 let pendingReviewId = null;
@@ -1169,10 +1170,13 @@ document.addEventListener('click', e => {
 
 // ── WebSocket ──────────────────────────────────────────────────────
 function initWebSocket() {
-  const wsHost = `ws://${window.location.hostname || '127.0.0.1'}:8000/ws/events`;
+  let wsUrl = isLocal ? `ws://127.0.0.1:8000/ws/events` : `ws://${window.location.host}/api/ws/events`;
+  if (window.location.protocol === 'https:') {
+    wsUrl = wsUrl.replace('ws://', 'wss://');
+  }
   let ws;
   try {
-    ws = new WebSocket(wsHost);
+    ws = new WebSocket(wsUrl);
   } catch(e) { scheduleReconnect(); return; }
 
   const dot = document.getElementById('ws-dot');
