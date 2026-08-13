@@ -812,3 +812,11 @@ async def get_invoke_status(review_id: str):
     from proxy.audit import get_review_status
     status = get_review_status(review_id)
     return {"status": "success", "review_id": review_id, "decision": status}
+
+from fastapi.responses import FileResponse
+
+@app.get("/")
+async def root():
+    return FileResponse("dashboard/chat.html")
+
+app.mount("/", StaticFiles(directory="dashboard"), name="dashboard")
