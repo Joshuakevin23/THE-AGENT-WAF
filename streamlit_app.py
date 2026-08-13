@@ -497,7 +497,7 @@ elif page == "🧪 Demo Scenarios":
         review_id = review["review_id"]
         
         try:
-            status_res = requests.get(f"{BACKEND_URL}/admin/reviews/{review_id}", timeout=3)
+            status_res = requests.get(f"{BACKEND_URL}/invoke/status/{review_id}", timeout=3)
             if status_res.status_code == 200:
                 rev_data = status_res.json()
                 decision = rev_data.get("decision")
