@@ -83,7 +83,7 @@ if pending_count > 0:
     nav_label += f" ({pending_count} pending)"
 
 # Navigation Selector
-page = st.sidebar.radio("Navigation", ["🤖 Chat Agent Console", nav_label])
+page = st.sidebar.radio("Navigation", ["🤖 Chat Agent Console", "🧪 Demo Scenarios", nav_label])
 
 # Model Selection
 model = st.sidebar.selectbox(
@@ -449,7 +449,108 @@ if page == "🤖 Chat Agent Console":
         st.rerun()
 
 # ========================================================
-# Page 2: Admin Dashboard
+# Page 2: Demo Scenarios
+# ========================================================
+elif page == "🧪 Demo Scenarios":
+    st.title("🧪 Pre-configured Demo Scenarios")
+    st.caption("Click a scenario below to run a scripted sequence of WAF tool calls and see how the proxy responds.")
+    
+    # Helper to run a sequence
+    def run_scenario(name, steps):
+        agent_id = f"demo-{name.lower().replace(' ', '-')}"
+        session_id = f"{agent_id}-{int(time.time())}"
+        results = []
+        with st.status(f"Running Scenario: {name}...", expanded=True) as status:
+            for step_idx, step in enumerate(steps, 1):
+                tool = step["tool"]
+                params = step["params"]
+                st.write(f"{step_idx}️⃣ Calling `{tool}`...")
+                res = requests.post(f"{BACKEND_URL}/invoke", json={"agent_id": agent_id, "session_id": session_id, "tool": tool, "params": params}, timeout=5).json()
+                results.append({"step": step_idx, "tool": tool, "response": res})
+                time.sleep(0.5)
+            status.update(label=f"Scenario Complete!", state="complete", expanded=False)
+        st.session_state.scenario_results = results
+        st.rerun()
+
+    # Scenario Definitions
+    scenarios = {
+        "1. Happy Path (Allowed)": [
+            {"tool": "get_schema", "params": {}},
+            {"tool": "validate_sql", "params": {"sql": "SELECT * FROM project_x_customers;"}},
+            {"tool": "execute_sql", "params": {"sql": "SELECT * FROM project_x_customers;"}}
+        ],
+        "2. Data Scope Block (Blocked)": [
+            {"tool": "get_schema", "params": {}},
+            {"tool": "validate_sql", "params": {"sql": "SELECT * FROM other_tenant_orders;"}},
+        ],
+        "3. Shadow Mode (Shadowed)": [
+            {"tool": "get_schema", "params": {}},
+            {"tool": "validate_sql", "params": {"sql": "SELECT * FROM project_x_orders;"}},
+            {"tool": "execute_sql", "params": {"sql": "SELECT * FROM project_x_orders;"}}
+        ],
+        "4. High Risk (HITL)": [
+            {"tool": "get_schema", "params": {}},
+            {"tool": "validate_sql", "params": {"sql": "DROP TABLE project_x_customers;"}},
+            {"tool": "execute_sql", "params": {"sql": "DROP TABLE project_x_customers;"}}
+        ]
+    }
+
+    # Scenario Buttons
+    col1, col2 = st.columns(2)
+    for idx, (s_name, s_steps) in enumerate(scenarios.items()):
+        target_col = col1 if idx % 2 == 0 else col2
+        if target_col.button(f"▶️ Run {s_name}", use_container_width=True):
+            run_scenario(s_name, s_steps)
+
+    st.divider()
+
+    # Render Results
+    if "scenario_results" in st.session_state and st.session_state.scenario_results:
+        st.subheader("📊 Scenario Execution Results")
+        for res in st.session_state.scenario_results:
+            step = res["step"]
+            tool = res["tool"]
+            data = res["response"]
+            
+            disposition = data.get("disposition", "unknown")
+            if disposition == "blocked":
+                disp_html = "<span class='status-blocked'>Blocked</span>"
+            elif disposition == "shadow_block":
+                disp_html = "<span class='status-shadow'>Shadow Blocked</span>"
+            elif disposition == "pending_hitl":
+                disp_html = "<span style='color: orange; font-weight: bold;'>Pending HITL</span>"
+            else:
+                disp_html = "<span class='status-allowed'>Allowed</span>"
+            
+            st.markdown(f"### Step {step}: `{tool}`")
+            st.markdown(disp_html, unsafe_allow_html=True)
+            
+            c1, c2 = st.columns(2)
+            with c1:
+                st.markdown("**Action Reason:**")
+                if data.get("reason"):
+                    if disposition == "blocked":
+                        st.error(data.get("reason"))
+                    elif disposition == "shadow_block":
+                        st.warning(data.get("reason"))
+                    elif disposition == "pending_hitl":
+                        st.warning(data.get("reason"))
+                    else:
+                        st.success(data.get("reason"))
+                else:
+                    st.info("No explicit reason provided.")
+            with c2:
+                st.markdown(f"**Risk Band:** {data.get('risk_band')} (Score: {data.get('risk_score')})")
+                st.markdown("**Raw Output:**")
+                st.json(data.get("result", {}))
+            st.divider()
+            
+        if st.button("Clear Results"):
+            st.session_state.scenario_results = None
+            st.rerun()
+
+# ========================================================
+# Page 3: Admin Dashboard
 # ========================================================
 elif page.startswith("📊 Admin Dashboard"):
     st.title("🛡️ WAF Policy Admin Dashboard")
