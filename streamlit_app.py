@@ -111,6 +111,86 @@ st.sidebar.info("""
 * `employees` (no prefix)
 """)
 
+# WAF Pipeline Visualization in Sidebar
+st.sidebar.markdown("""
+<style>
+.pipeline-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-family: sans-serif;
+    margin-top: 10px;
+    margin-bottom: 20px;
+    padding: 0 10px;
+}
+.pipeline-node {
+    background: #0f172a;
+    border: 2px solid #334155;
+    border-radius: 8px;
+    padding: 12px;
+    width: 100%;
+    text-align: center;
+    position: relative;
+    z-index: 2;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+}
+.pipeline-node:hover {
+    border-color: #3b82f6;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px -2px rgba(59, 130, 246, 0.4);
+}
+.pipeline-pipe {
+    width: 4px;
+    height: 24px;
+    background: linear-gradient(to bottom, #334155, #475569);
+    margin: 0 auto;
+    z-index: 1;
+}
+.node-title {
+    font-weight: bold;
+    font-size: 14px;
+    color: #f8fafc;
+    margin-bottom: 4px;
+}
+.node-desc {
+    font-size: 11px;
+    color: #94a3b8;
+}
+</style>
+<hr/>
+<div style="text-align: center; font-weight: bold; margin-bottom: 15px; color: #f8fafc; font-size: 16px;">
+    🔄 Proxy Workflow Pipeline
+</div>
+<div class="pipeline-container">
+    <div class="pipeline-node" style="border-color: #8b5cf6;">
+        <div class="node-title">1️⃣ Intercept</div>
+        <div class="node-desc">Agent Tool Call Captured</div>
+    </div>
+    <div class="pipeline-pipe"></div>
+    <div class="pipeline-node" style="border-color: #0ea5e9;">
+        <div class="node-title">2️⃣ Risk Analysis</div>
+        <div class="node-desc">Policy, Scope & Rate Checks</div>
+    </div>
+    <div class="pipeline-pipe"></div>
+    <div class="pipeline-node" style="border-color: #10b981;">
+        <div class="node-title">3️⃣ Decision Engine</div>
+        <div class="node-desc">Allow / Block / Shadow</div>
+    </div>
+    <div class="pipeline-pipe"></div>
+    <div class="pipeline-node" style="border-color: #f59e0b;">
+        <div class="node-title">4️⃣ HITL Review</div>
+        <div class="node-desc">Admin Approval for High Risk</div>
+    </div>
+    <div class="pipeline-pipe"></div>
+    <div class="pipeline-node" style="border-color: #ef4444;">
+        <div class="node-title">5️⃣ Execution</div>
+        <div class="node-desc">Action Runs on DB</div>
+    </div>
+</div>
+<hr/>
+""", unsafe_allow_html=True)
+
 # Render rule validation traces
 def render_traces(steps):
     if not steps:
