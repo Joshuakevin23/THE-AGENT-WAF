@@ -4,6 +4,7 @@ import requests
 from typing import Dict, Any, List, Set, Optional
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, BackgroundTasks, Body
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from proxy.config import config
