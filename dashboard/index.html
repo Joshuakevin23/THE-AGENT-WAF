@@ -783,9 +783,24 @@
           <div class="msg msg-assistant">
             <div class="bubble bubble-assistant">
               <p class="text-sm font-medium mb-1" style="color:var(--text-muted);">WAF Database Assistant</p>
-              Hello. I am your AI-powered database assistant. All actions I perform are monitored and enforced by the WAF proxy in real time.
-              <br><br>
-              You may ask questions such as: <em>"Show me all customers from the USA"</em> or <em>"How many orders were placed last month?"</em>
+              <p class="mb-2">Hello. I am your AI-powered database assistant. All actions I perform are monitored and enforced by the WAF proxy in real time.</p>
+              
+              <div class="text-sm bg-slate-800 p-3 rounded-lg border border-slate-700 my-3">
+                <p class="font-bold text-indigo-400 mb-1">What I can access:</p>
+                <ul class="list-disc pl-5 mb-3 text-slate-300">
+                  <li>Query the schema to understand the database structure.</li>
+                  <li>Read data from authorized tables (<code>project_x_customers</code>, <code>project_x_orders</code>, <code>project_x_employees</code>).</li>
+                </ul>
+                
+                <p class="font-bold text-red-400 mb-1">What I cannot do (Enforced by WAF):</p>
+                <ul class="list-disc pl-5 text-slate-300">
+                  <li>Access unauthorized tables from other tenants (e.g., <code>other_tenant_orders</code>).</li>
+                  <li>Execute destructive commands like <code>DROP</code>, <code>DELETE</code>, or <code>UPDATE</code> without administrator approval.</li>
+                  <li>Bypass rate limits or skip required SQL validation steps.</li>
+                </ul>
+              </div>
+              
+              <p class="text-sm">You may ask questions such as: <em>"Show me all customers from the USA"</em> or <em>"How many orders were placed last month?"</em></p>
             </div>
           </div>
         </div>
